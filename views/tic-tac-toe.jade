@@ -1,0 +1,25 @@
+extends layout
+
+block link
+	link(rel='stylesheet', href='stylesheets/tic-tac-toe.css')
+
+block content
+	h3 tic-tac-toe
+
+	div.col-xs-10.col-xs-offset-1.col-sm-4.col-sm-offset-4
+		table.col-xs-12
+			tr
+				td.text-center
+				td.text-center
+				td.text-center
+			tr
+				td.text-center
+				td.text-center
+				td.text-center
+			tr
+				td.text-center
+				td.text-center
+				td.text-center
+
+block script
+	script(src='javascripts/tic-tac-toe.js')
