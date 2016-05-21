@@ -1,0 +1,34 @@
+extends layout
+
+block link
+	link(rel='stylesheet', href='stylesheets/board.css')
+
+block content
+	.container-fluid
+		.row
+			.col-xs-6.col-xs-offset-3
+				table.col-xs-12
+					tr
+						td.text-center(data-index="0", marked="false", active="false")
+						td.text-center(data-index="1", marked="false", active="false")
+						td.text-center(data-index="2", marked="false", active="false")
+					tr
+						td.text-center(data-index="3", marked="false", active="false")
+						td.text-center(data-index="4", marked="false", active="false")
+						td.text-center(data-index="5", marked="false", active="false")
+					tr
+						td.text-center(data-index="6", marked="false", active="false")
+						td.text-center(data-index="7", marked="false", active="false")
+						td.text-center(data-index="8", marked="false", active="false")
+		.row
+			.col-xs-3.col-xs-offset-3.scoreBoard
+				h3.text-left
+					span#p1Score Waiting...
+			.col-xs-3.scoreBoard
+				h3.text-right
+					span#p2Score Waiting...
+
+block footer
+
+block script
+	script(src='javascripts/boardStyle.js')

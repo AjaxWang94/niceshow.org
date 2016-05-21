@@ -1,25 +1,19 @@
 extends layout
 
-block link
-	link(rel='stylesheet', href='stylesheets/tic-tac-toe.css')
-
 block content
-	h3 tic-tac-toe
-
-	div.col-xs-10.col-xs-offset-1.col-sm-4.col-sm-offset-4
-		table.col-xs-12
-			tr
-				td.text-center
-				td.text-center
-				td.text-center
-			tr
-				td.text-center
-				td.text-center
-				td.text-center
-			tr
-				td.text-center
-				td.text-center
-				td.text-center
+	.container
+		div.page-header
+			h3 Tic Tac Toe
+		div#information
+		div#game-field
+			iframe(src="board", width="100%", height="600")
+			.input-group.hide#nameInputGroup
+				input.form-control#nameInput(type="text", placeholder="Username")
+				span.input-group-btn
+					button.btn.btn-default#playBtn(type="button") Play
+			.alert.alert-info.hide#connecting(role="alert") Connecting to game server...
+			.alert.alert-success.hide#connected(role="alert") Connection successful
 
 block script
+	script(src='javascripts/Board.js')
 	script(src='javascripts/tic-tac-toe.js')
