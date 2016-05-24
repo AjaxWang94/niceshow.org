@@ -1,42 +1,37 @@
 $(document).ready(function() {
 
-	var wsUri = "ws://localhost:4080"
-	// var wsUri = "ws://192.168.31.16:4080"
+	var wsUri = "ws://localhost:4080";
+	// var wsUri = "ws://192.168.31.16:4080";
 	
 	var events = {
 			outgoing: {
-					JOIN_GAME: 'csJoinGame',
-					MARK: 'csMark',
-					QUIT: 'csQuit'
+		    PLAYER_CONNECTED: 'csPlayerConnected',
+				SYNC_STATE: 'csSyncState',
+				JOIN_ROOM: 'csJoinRoom',
+				JOIN_TABLE: 'csJoinTable',
+				MARK: 'csMark',
+				QUIT_TABLE: 'csQuitTable'
 			},
 			incoming: {
-					JOIN_GAME: 'scJoinGame',
-					MARK: 'scMark',
-					SET_TURN: 'scSetTurn',
-					OPPONENT_READY: 'scOpponentReady',
-					GAME_OVER: 'scGameOver',
-					ERROR: 'scError',
-					QUIT: 'scQuit'
+		    PLAYER_CONNECTED: 'scPlayerConnected',
+				SYNC_STATE: 'scSyncState',
+				JOIN_ROOM: 'scJoinRoom',
+				JOIN_TABLE: 'scJoinTable',
+				MARK: 'scMark',
+				SET_TURN: 'scSetTurn',
+				OPPONENT_READY: 'scOpponentReady',
+				GAME_OVER: 'scGameOver',
+				ERROR: 'scError',
+				QUIT_TABLE: 'scQuitTable'
 			}
 	};
 
-	var hero = {};
-	var board = new Board();
-
-	$("iframe").load(function() {
-		board.init();
-		$("#nameInputGroup").removeClass("hide");
-	});
-
-	$("#playBtn").click(function() {
-		var name = jQuery.trim($("#nameInput").val());
-		if (name.length > 0) {
-			hero.name = name;
-			$("#nameInputGroup").remove();
-			$("#connecting").removeClass("hide");
-			init();
-		}
-	});
+	var player = new Player();
+	var tables = [];
+	var websocket;
+	for (var i = 0; i < 8; i++) {
+		tables.push(new Table(i));
+	}
 
 	function makeMessage(action, data){
 		var resp = {
@@ -46,12 +41,48 @@ $(document).ready(function() {
 		return JSON.stringify(resp);
 	}
 
-	board.onMark = function(cellId){
-		websocket.send(makeMessage(events.outgoing.MARK, {playerId: hero.id, cellId: cellId}));
-	};
+	$("#playBtn").click(function() {
+		var name = jQuery.trim($("#nameInput").val());
+		if (name.length > 0) {
+			player.name = name;
+			websocket.send(makeMessage(events.outgoing.JOIN_ROOM, player.name));
+		}
+	});
+
+	$(".panel-heading").hover(
+		function() {
+			if (player.name && !(player.currentTable+1)) {
+				var index = parseInt($(this).parent().attr("table-index"));
+				if (tables[index].isOnGame === false) {
+					$(this).css({cursor: "pointer"});
+				}
+			}
+		},
+		function() {
+			$(this).css({cursor: "default"});
+		}
+	);
+
+	$(".panel-heading").click(function() {
+		var offset = $(this).parent().offset();
+		console.log(offset);
+		if (player.name && !(player.currentTable+1)) {
+			$(this).css({cursor: "default"});
+			var tableIndex = parseInt($(this).parent().attr("table-index"));
+			var msg = {playerId: player.id, tableIndex: tableIndex, name: player.name};
+			websocket.send(makeMessage(events.outgoing.JOIN_TABLE, msg));
+		}
+	});
+
+	for (var i = 0; i < 8; i++) {
+		tables[i].onMark = function(tableIndex, cellId){
+			websocket.send(makeMessage(events.outgoing.MARK, {tableIndex: tableIndex, cellId: cellId}));
+		};
+	}
 
 	function init()
 	{
+		console.log("int()");
 		websocket = new WebSocket(wsUri);
 		websocket.onopen = function(evt) { onOpen(evt) };
 		websocket.onclose = function(evt) { onClose(evt) };
@@ -62,8 +93,7 @@ $(document).ready(function() {
 	function onOpen(evt)
 	{
 		console.log("wss CONNECTED");
-		$("#connected").removeClass("hide");
-		websocket.send(makeMessage(events.outgoing.JOIN_GAME, hero.name));
+		websocket.send(makeMessage(events.outgoing.SYNC_STATE, {}));
 	}
 
 	function onClose(evt)
@@ -82,35 +112,46 @@ $(document).ready(function() {
 				alert('Error: ' + msg.data);
 				break;
 
-			case events.incoming.JOIN_GAME:
-				board.addPlayer(msg.data);
-				if (msg.data.name === hero.name) {
-					hero = msg.data;
+			case events.incoming.PLAYER_CONNECTED:
+				console.log("player connected.");
+				player.id = msg.data.socketId;
+				break;
+
+			case events.incoming.SYNC_STATE:
+				for (var i = 0; i < 8; i++) {
+					tables[i].syncState(msg.data[i]);
+				}
+				break;
+
+			case events.incoming.JOIN_TABLE:
+				tables[msg.data.tableIndex].addPlayer(msg.data.label, msg.data.name);
+				if (msg.data.playerId === player.id){
+					player.currentTable = msg.data.tableIndex;
+					player.label = msg.data.label;
 				}
 				break;
 
 			case events.incoming.SET_TURN:
-				board.ready = true;
-				if (msg.data.id === hero.id) {
-					console.log("enableTurn()");
-					board.enableTurn();
-				}
+				tables[msg.data.tableIndex].isOnGame = true;
+				tables[msg.data.tableIndex].enableTurn();
 				break;
 
 			case events.incoming.MARK:
-				board.doMark(msg.data.cellId, msg.data.player.label);
+				tables[msg.data.tableIndex].doMark(msg.data.cellId, msg.data.label);
 				break;
 
 			case events.incoming.GAME_OVER:
-				if (msg.data.player) {
-					board.doWinner(msg.data.pos);
+				if (msg.data.pos) {
+					tables[msg.data.tableIndex].doWinner(msg.data);
 				} else {
-					board.doDraw();
+					tables[msg.data.tableIndex].doDraw();
 				}
-				websocket.send(makeMessage(events.outgoing.QUIT, hero.id));
+				if (msg.data.tableIndex === player.currentTable) {
+					player.init();
+				}
 				break;
 
-			case events.incoming.QUIT:
+			case events.incoming.QUIT_TABLE:
 				websocket.close();
 				break;
 		}
@@ -120,5 +161,7 @@ $(document).ready(function() {
 	{
 		console.log('ERROR: ' + evt.data);
 	}
+
+	init();
 
 });

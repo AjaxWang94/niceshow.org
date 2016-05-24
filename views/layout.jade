@@ -6,14 +6,13 @@ html(lang='en')
 		meta(name='viewport', content='width=device-width, initial-scale=1')
 		title= title
 		link(rel='stylesheet', href='bootstrap-3.3.6-dist/css/bootstrap.css')
+		link(rel='stylesheet', href='stylesheets/sticky-footer.css')
 		block link
-			link(rel='stylesheet', href='stylesheets/sticky-footer.css')
 	body
 		block content
-		block footer
-			footer.footer
-				.container
-					p.text-center.text-muted 浙ICP备15033535号-2
+		footer.footer
+			.container
+				p.text-center.text-muted 浙ICP备15033535号-2
 		script(src='javascripts/jquery-2.2.3.js')
 		script(src='bootstrap-3.3.6-dist/js/bootstrap.js')
 		block script

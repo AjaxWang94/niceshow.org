@@ -1,3 +1,7 @@
+table {
+	width: 100%;
+}
+
 table td {
 	border: 1px solid black;
 	width: 33.333333%;
@@ -15,7 +19,11 @@ table tr td:last-child {
 	border-right-color: transparent;
 }
 
-td[active="true"]:hover {
+td[isActive="true"]:hover {
 	cursor: pointer;
 	background-color: yellow;
+}
+
+.panel-heading h6 {
+	margin: 2px 0;
 }

@@ -4,27 +4,74 @@ var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({ server: server });
 var port = 4080;
 
-var Board = require('./BoardServer');
+var Table = require('./TableServer');
 var Player = require('./Player');
 
-var board = new Board();
+var sockets = new Map();
+var tables = [];
+var players = [];
+
+for (var i = 0; i < 8; i++) {
+	tables.push(new Table(i));
+	players.push(["", ""]);
+}
+console.log(tables.length + " tables added.");
 
 var events = {
 	incoming: {
-		JOIN_GAME: 'csJoinGame',
+    PLAYER_CONNECTED: 'csPlayerConnected',
+		SYNC_STATE: 'csSyncState',
+		JOIN_ROOM: 'csJoinRoom',
+		JOIN_TABLE: 'csJoinTable',
 		MARK: 'csMark',
-		QUIT: 'csQuit'
+		QUIT_TABLE: 'csQuitTable'
 	},
 	outgoing: {
-		JOIN_GAME: 'scJoinGame',
+    PLAYER_CONNECTED: 'scPlayerConnected',
+		SYNC_STATE: 'scSyncState',
+		JOIN_ROOM: 'scJoinRoom',
+		JOIN_TABLE: 'scJoinTable',
 		SET_TURN: 'scSetTurn',
 		MARK: 'scMark',
 		OPPONENT_READY: 'scOpponentReady',
 		GAME_OVER: 'scGameOver',
 		ERROR: 'scError',
-		QUIT: 'scQuit'
+		QUIT_TABLE: 'scQuitTable'
 	}
 };
+
+for (var i = 0; i < 8; i++) {
+
+	tables[i].on(Table.events.JOIN_TABLE, function(msg) {
+		console.log("JOIN_TABLE");
+		wss.clients.forEach(function(client) {
+			client.send(makeMessage(events.outgoing.JOIN_TABLE, msg));
+		});
+	});
+
+	tables[i].on(Table.events.SET_TURN, function(msg) {
+		var client = sockets.get(players[msg.tableIndex][msg.label])[0];
+		client.send(makeMessage(events.outgoing.SET_TURN, msg));
+	});
+
+	tables[i].on(Table.events.CELL_MARKED, function(msg) {
+		wss.clients.forEach(function(client) {
+			client.send(makeMessage(events.outgoing.MARK, msg));
+		});
+	});
+
+	tables[i].on(Table.events.WINNER, function(msg) {
+		wss.clients.forEach(function(client) {
+			client.send(makeMessage(events.outgoing.GAME_OVER, msg));
+		});
+	});
+
+	tables[i].on(Table.events.DRAW, function(msg) {
+		wss.clients.forEach(function(client) {
+			client.send(makeMessage(events.outgoing.GAME_OVER, msg));
+		});
+	});
+}
 
 function makeMessage(action, data) {
 	var resp = {
@@ -38,30 +85,20 @@ wss.on('connection', function connection(ws) {
 	var location = url.parse(ws.upgradeReq.url, true);
 	// you might use location.query.access_token to authenticate or share sessions 
 	// or ws.upgradeReq.headers.cookie (see http://stackoverflow.com/a/16395220/151312) 
- 
-	board.on(Board.events.PLAYER_CONNECTED, function(player) {
-		board.players.forEach(function(player) {
-			ws.send(makeMessage(events.outgoing.JOIN_GAME, player));
-		});
-	});
 
-	board.on(Board.events.SET_TURN, function(player) {
-		ws.send(makeMessage(events.outgoing.SET_TURN, player));
-	});
+	var socketId = ws.upgradeReq.headers['sec-websocket-key'];
+	console.log(socketId + " connected");
 
-	board.on(Board.events.CELL_MARKED, function(event) {
-		ws.send(makeMessage(events.outgoing.MARK, event));
-	});
+	sockets.set(socketId, [ws, ""]);
+	ws.send(makeMessage(events.outgoing.PLAYER_CONNECTED, {socketId: socketId}));
 
-	board.on(Board.events.WINNER, function(event) {
-		ws.send(makeMessage(events.outgoing.GAME_OVER, event));
-	});
-
-	board.on(Board.events.DRAW, function(event) {
-		ws.send(makeMessage(events.outgoing.GAME_OVER, event));
-	});
+	console.log("wss.clients.length: " + wss.clients.length);
 
 	ws.on('message', function incoming(msg) {
+
+		var socketId = ws.upgradeReq.headers['sec-websocket-key'];
+		console.log(socketId);
+
 		try {
 			console.log('received: %s', msg);
 			var msg = JSON.parse(msg);
@@ -73,19 +110,38 @@ wss.on('connection', function connection(ws) {
 		try {
 			switch (msg.action) {
 
-				case events.incoming.JOIN_GAME:
-					var player = new Player(board.players.length + 1, board.players.length === 0 ? 'X' : 'O', msg.data);
-					board.addPlayer(player);
+				case events.incoming.SYNC_STATE:
+					console.log("SYNC_STATE");
+					ws.send(makeMessage(events.outgoing.SYNC_STATE, tables));
+					break;
+
+				case events.incoming.JOIN_ROOM:
+					sockets.get(socketId)[1] = msg.data;
+					console.log(sockets.get(socketId)[1] + " joined room.");
+					ws.send(makeMessage(events.outgoing.JOIN_ROOM, {}));
+					break;
+
+				case events.incoming.JOIN_TABLE:
+					var tableIndex = msg.data.tableIndex;
+					if (players[tableIndex][0] === "") {
+						players[tableIndex][0] = socketId;
+						tables[tableIndex].addPlayer(0, msg.data.playerId, msg.data.name);
+					} else if (players[tableIndex][1] === "") {
+						players[tableIndex][1] = socketId;
+						tables[tableIndex].addPlayer(1, msg.data.playerId, msg.data.name);
+					}
 					break;
 
 				case events.incoming.MARK:
-					if (board.checkTurn(msg.data.playerId)) {
-						board.mark(msg.data.cellId);
+					var tableIndex = msg.data.tableIndex;
+					var currentTurn = tables[tableIndex].currentTurn;
+					if (players[tableIndex][currentTurn] === socketId) {
+						tables[tableIndex].mark(msg.data.cellId);
 					}
 					break;
 
 				case events.incoming.QUIT:
-					board = new Board();
+					console.log("quit");
 					ws.send(makeMessage(events.outgoing.QUIT, {}));
 					break;
 			}
@@ -93,7 +149,6 @@ wss.on('connection', function connection(ws) {
 			ws.send(makeMessage(events.outgoing.ERROR, error.message));
 		}
 	});
-
  });
 
 server.listen(
