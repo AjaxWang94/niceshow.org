@@ -7,7 +7,7 @@ block content
 	.container
 		div.page-header
 			h3 Tic Tac Toe
-		.input-group#nameInputGroup
+		.col-sm-6.col-md-3.input-group#nameInputGroup
 			input.form-control#nameInput(type="text", placeholder="Nickname")
 			span.input-group-btn
 				button.btn.btn-default#playBtn(type="button") Play
@@ -15,15 +15,17 @@ block content
 		- var n = 0
 		.row#row0
 			while n < 4
-				.col-xs-3.panel.panel-default(table-index= n)
+				.col-sm-6.col-md-3.panel.panel-default(table-index= n)
 					.panel-heading
 						.row
 							.col-xs-6
-								h6.text-left X
+								h6.col-xs-6.text-left X
+								h6.col-xs-6.text-left#countdown0 0
 								h6.text-left
 									span.playerName#p0Name &nbsp;
 							.col-xs-6
-								h6.text-right O
+								h6.col-xs-6.text-right#countdown1 0
+								h6.col-xs-6.text-right O
 								h6.text-right
 									span.playerName#p1Name &nbsp;
 					.panel-body
@@ -53,15 +55,17 @@ block content
 		- var n = 0
 		.row#row1
 			while n < 4
-				.col-xs-3.panel.panel-default(table-index= n+4)
+				.col-sm-6.col-md-3.panel.panel-default(table-index= n+4)
 					.panel-heading
 						.row
 							.col-xs-6
-								h6.text-left X
+								h6.col-xs-6.text-left X
+								h6.col-xs-6.text-left#countdown0 0
 								h6.text-left
 									span.playerName#p0Name &nbsp;
 							.col-xs-6
-								h6.text-right O
+								h6.col-xs-6.text-right#countdown1 0
+								h6.col-xs-6.text-right O
 								h6.text-right
 									span.playerName#p1Name &nbsp;
 					.panel-body

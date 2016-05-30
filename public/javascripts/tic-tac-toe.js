@@ -41,11 +41,19 @@ $(document).ready(function() {
 		return JSON.stringify(resp);
 	}
 
+	for (var i = 0; i < 8; i++) {
+		tables[i].onMark = function(tableIndex, cellId){
+			websocket.send(makeMessage(events.outgoing.MARK, {tableIndex: tableIndex, cellId: cellId}));
+		};
+	}
+
 	$("#playBtn").click(function() {
 		var name = jQuery.trim($("#nameInput").val());
 		if (name.length > 0) {
 			player.name = name;
 			websocket.send(makeMessage(events.outgoing.JOIN_ROOM, player.name));
+			$(this).attr({disabled: "disabled"});
+			$("#nameInput").attr({disabled: "disabled"});
 		}
 	});
 
@@ -65,20 +73,13 @@ $(document).ready(function() {
 
 	$(".panel-heading").click(function() {
 		var offset = $(this).parent().offset();
-		console.log(offset);
 		if (player.name && !(player.currentTable+1)) {
 			$(this).css({cursor: "default"});
 			var tableIndex = parseInt($(this).parent().attr("table-index"));
-			var msg = {playerId: player.id, tableIndex: tableIndex, name: player.name};
+			var msg = {tableIndex: tableIndex};
 			websocket.send(makeMessage(events.outgoing.JOIN_TABLE, msg));
 		}
 	});
-
-	for (var i = 0; i < 8; i++) {
-		tables[i].onMark = function(tableIndex, cellId){
-			websocket.send(makeMessage(events.outgoing.MARK, {tableIndex: tableIndex, cellId: cellId}));
-		};
-	}
 
 	function init()
 	{
@@ -109,11 +110,9 @@ $(document).ready(function() {
 		switch (msg.action) {
 
 			case events.incoming.ERROR:
-				alert('Error: ' + msg.data);
 				break;
 
 			case events.incoming.PLAYER_CONNECTED:
-				console.log("player connected.");
 				player.id = msg.data.socketId;
 				break;
 
@@ -124,9 +123,9 @@ $(document).ready(function() {
 				break;
 
 			case events.incoming.JOIN_TABLE:
-				tables[msg.data.tableIndex].addPlayer(msg.data.label, msg.data.name);
-				if (msg.data.playerId === player.id){
-					player.currentTable = msg.data.tableIndex;
+				tables[msg.data.currentTable].addPlayer(msg.data);
+				if (msg.data.id === player.id) {
+					player.currentTable = msg.data.currentTable;
 					player.label = msg.data.label;
 				}
 				break;
@@ -147,12 +146,19 @@ $(document).ready(function() {
 					tables[msg.data.tableIndex].doDraw();
 				}
 				if (msg.data.tableIndex === player.currentTable) {
-					player.init();
+					player.currentTable = -1;
+					player.label = -1;
 				}
 				break;
 
 			case events.incoming.QUIT_TABLE:
-				websocket.close();
+				if (msg.data.id === player.id) {
+					tables[player.currentTable].disableAll();
+					player.currentTable = -1;
+					player.label = -1;
+				}
+				tables[msg.data.currentTable].doQuit(msg.data.label);
+				// websocket.close();
 				break;
 		}
 	}

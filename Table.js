@@ -11,13 +11,14 @@ var Table = function(tableIndex) {
 };
 
 Table.prototype.clear = function() {
-	this.players = ["", ""];
+	this.players = [];
 	this.isOnGame = false;
 	this.currentTurn = 0;
 	this.cells = [];
 	for (var i = 0; i < 9; i++) {
 		this.cells.push({label: -1, active: false});
 	}
+	this.timeoutObject;
 };
 
 Table.events = {
@@ -25,7 +26,8 @@ Table.events = {
 	SET_TURN: 'setTurn',
 	CELL_MARKED: 'cellMarked',
 	WINNER: 'winner',
-	DRAW: 'draw'
+	DRAW: 'draw',
+	QUIT: 'quit'
 };
 
 util.inherits(Table, EventEmitter);
@@ -36,15 +38,26 @@ Table.prototype.disableAll = function() {
 	});
 };
 
-Table.prototype.enableAll = function() {
+Table.prototype.enableTurn = function() {
 	this.cells.forEach(function(cell) {
-		cell.active = true;
+		if (cell + 1) {
+			cell.active = true;
+		}
 	});
 };
 
 Table.prototype.checkTurn = function(socketId) {
 	return this.players[this.currentTurn].id == playerId;
 };
+
+Table.prototype.quit = function(that) {
+	// console.log(that.currentTurn + " quit");
+	that.isOnGame = false;
+	that.disableAll();
+	that.emit(Table.events.QUIT, that.players[that.currentTurn]);
+	that.players[that.currentTurn] = undefined;
+	clearTimeout(that.timeoutObject);
+}
 
 Table.prototype.mark = function(cellId) {
 
@@ -55,14 +68,18 @@ Table.prototype.mark = function(cellId) {
 	}
 
 	if (this.isOnGame && cell.active) {
+		// stop former timeout
+		if (this.timeoutObject) {
+			clearTimeout(this.timeoutObject);
+			// console.log("timeout stoped");
+		}
+
 		var player = this.players[this.currentTurn];
 		var label = this.currentTurn;
 		cell.label = label;
 		cell.active = false;
 
 		this.emit(Table.events.CELL_MARKED, {tableIndex: this.tableIndex, cellId: cellId, label: label});
-
-		// console.log(this.cells);
 
 		var res = this.checkWinner(label);
 		if (res.win) {
@@ -75,8 +92,8 @@ Table.prototype.mark = function(cellId) {
 			this.emit(Table.events.DRAW, {tableIndex: this.tableIndex});
 		} else {
 			this.currentTurn = (this.currentTurn + 1) % 2;
-			var msg = {tableIndex: this.tableIndex, label: this.currentTurn};
-			this.emit(Table.events.SET_TURN, msg);
+			this.emit(Table.events.SET_TURN, this.players[this.currentTurn]);
+			this.timeoutObject = setTimeout(this.quit, 10000, this);
 		}
 	}
 };
@@ -100,7 +117,7 @@ Table.prototype.checkWinner = function(label) {
 
 	var win = winPosition.some(function(win) {
 		if (this.cells[win[0]].label === label) {
-			var res = this.cells[win[0]].label === this.cells[win[1]].label && this.cells[win[1]].label === this.cells[win[2]].label;
+			var res = this.cells[win[1]].label === label && this.cells[win[2]].label === label;
 
 			if (res) {
 				pos = win;
@@ -123,18 +140,14 @@ Table.prototype.checkDraw = function() {
 	}, this);
 };
 
-Table.prototype.addPlayer = function(label, playerId, name) {
-
-	this.players[label] = name;
-	this.isOnGame = this.players[0] && this.players[1];
-	var msg = {tableIndex: this.tableIndex, label: label, playerId: playerId, name: name};
-	this.emit(Table.events.JOIN_TABLE, msg);
+Table.prototype.addPlayer = function(player) {
+	this.players[player.label] = player;
+	this.isOnGame = this.players[0] != undefined && this.players[1] != undefined;
+	this.emit(Table.events.JOIN_TABLE, player);
 
 	if (this.isOnGame) {
-		this.enableAll();
-		var opponent = label ? 0 : 1;
-		var msg = {tableIndex: this.tableIndex, label: opponent};
-		this.emit(Table.events.SET_TURN, msg);
+		this.enableTurn();
+		this.emit(Table.events.SET_TURN, this.players[this.currentTurn]);
 	}
 };
 

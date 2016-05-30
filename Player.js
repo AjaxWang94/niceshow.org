@@ -1,7 +1,8 @@
-var Player = function(id, label, name) {
-	this.id = id;
-	this.label = label;
-	this.name = name;
+var Player = function() {
+	this.id = "";
+	this.name = "";
+	this.currentTable = -1;
+	this.label = -1;
 };
 
 module.exports = Player;
