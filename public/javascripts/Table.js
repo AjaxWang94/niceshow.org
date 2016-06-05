@@ -1,91 +1,26 @@
-/**
- *
- * @constructor
- */
 var Table = function(tableIndex) {
 	this.tableIndex = tableIndex;
 	this.table = $("div[table-index='"+tableIndex+"']");
-	this.clear();
-	var that = this;
-	this.table.find("td").click(function() {
-		if (that.isOnGame && $(this).attr("isActive") === "true") {
-			that.disableAll();
-			that.onMark(that.tableIndex, $(this).attr("cellId"));
-		}
-	});
-};
 
-Table.prototype.clear = function() {
-	this.players = [];
-	this.table.find("#p" + 0 +"Name").html("&nbsp;");
-	this.table.find("#p" + 1 +"Name").html("&nbsp;");
-	this.isOnGame = false;
-	this.currentTurn = 0;
-	this.table.find("td").each(function() {
-		$(this).attr({marked: "false"});
-		$(this).attr({isActive: "false"});
-		$(this).find("strong").text("");
-	});
+	this.initPlayers();
+	this.initBoard();
+
 	this.intervalID = undefined;
 	this.counts = undefined;
+
+	this.result = -1;
 };
 
-Table.prototype.syncState = function(table) {
-	this.addPlayer(table.players[0]);
-	this.addPlayer(table.players[1]);
-	for (var i = 0; i < 9; i++) {
-		this.doMark(i, table.cells[i].label);
-	}
+Table.prototype.initPlayers = function() {
+	this.players = [];
+	this.table.find("#p0Name").html("&nbsp;");
+	this.table.find("#p1Name").html("&nbsp;");
 };
 
-Table.prototype.addPlayer = function(player) {
-	if (player != undefined) {
-		this.table.find("strong").stop(true, true);
-		this.players[player.label] = player;
-		this.table.find("#p"+player.label+"Name").html(player.name);
-	}
-};
-
-Table.prototype.onMark = function(tableIndex, cellId) {};
-
-Table.prototype.doMark = function(cellId, label) {
-	if (label + 1) {
-		// stop former timeout
-		if (this.intervalID) {
-			clearInterval(this.intervalID);
-		}
-
-		var cell = this.table.find("td[cellId="+cellId+"]");
-		cell.attr({marked: "true", isActive: "false"});
-		cell.find("strong").text(label?"O":"X");
-		var cellWidth = cell.width();
-		cell.find("strong").css({"line-height": cellWidth+"px", "font-size": cellWidth*0.6+"px"});
-		// countdown opponent
-		this.currentTurn = (this.currentTurn + 1) % 2;
-		this.counts = 10;
-		this.table.find("#countdown" + this.currentTurn).text(this.counts);
-		this.intervalID = setInterval(this.count, 1000, this);
-		console.log("this.intervalID: " + this.intervalID);
-	}
-};
-
-Table.prototype.count = function(that) {
-	counts = --that.counts;
-	that.table.find("#countdown" + that.currentTurn).text(counts);
-	if (counts === 0) {
-		clearInterval(that.intervalID);
-	}
-};
-
-Table.prototype.doQuit = function(label) {
-	this.players[label] = undefined;
-	this.isOnGame = false;
-	this.table.find("#p"+label+"Name").html("&nbsp;");
-};
-
-Table.prototype.disableAll = function() {
+Table.prototype.initBoard = function() {
 	this.table.find("td").each(function() {
-		$(this).attr({isActive: "false"});
+		$(this).attr({marked: "false", isActive: "false"});
+		$(this).find("strong").text("");
 	});
 };
 
@@ -97,30 +32,134 @@ Table.prototype.enableTurn = function() {
 	});
 };
 
-Table.prototype.doWinner = function(data) {
-	clearInterval(this.intervalID);
-
-	for (var i = 0; i < data.pos.length; i++) {
-		this.table.find('[cellId="'+data.pos[i]+'"]').addClass("text-primary");
-	}
-	this.disableAll();
-	var that = this;
-	$.when(this.table.find('strong').fadeOut(2000, function() {
-		$(this).parent().removeClass("text-primary");
-		$(this).show();
-	})).then(function() {
-		that.clear();
+Table.prototype.disableBoard = function() {
+	this.table.find("td").each(function() {
+		$(this).attr({isActive: "false"});
 	});
-	console.log("game over win");
 };
 
-Table.prototype.doDraw = function() {
-	clearInterval(this.intervalID);
+Table.prototype.syncState = function(table) {
+	this.result = table.result;
+	this.addPlayer(table.players[0]);
+	this.addPlayer(table.players[1]);
+	for (var i = 0; i < 9; i++) {
+		this.doMark(i, table.cells[i].label);
+	}
+	if (table.result != -1) {
+		if (table.result === 0 || table.result === 1) {
+			this.doWin({label: table.result, pos: table.winPos});
+		} else if (table.result === 2) {
+			this.doTie();
+		}
+	}
+};
 
-	this.disableAll();
+Table.prototype.addPlayer = function(player) {
+	if (player != undefined) {
+
+		if (this.result != -1) {
+			this.table.find("#result").text("");
+			this.table.find("#result").addClass("hidden");
+			this.initBoard();
+			this.table.find("td").each(function() {
+				$(this).removeClass("text-primary");
+			});
+			this.result = -1;
+		}
+
+		this.players[player.label] = player;
+		if (player.name != "") {
+			this.table.find("#p" + player.label + "Name").text(player.name);
+		} else {
+			this.table.find("#p" + player.label + "Name").text("Player" + player.label);
+		}
+		this.table.find("#timeCounter").removeClass("hidden");
+		this.table.find("#p" + player.label + "Counter").removeClass("hidden");
+	}
+};
+
+Table.prototype.ready = function() {
 	var that = this;
-	this.table.find('strong').fadeOut(2000, function() {
-		that.clear();
+	this.table.find("td").click(function() {
+		if ($(this).attr("isActive") === "true") {
+			that.disableBoard();
+			that.onMark(parseInt($(this).attr("cellId")));
+		}
 	});
-	console.log("game over draw");
+};
+
+Table.prototype.doQuit = function(label) {
+	this.players[label] = undefined;
+	this.table.find("#p" + label + "Name").html("&nbsp;");
+	this.table.find("#p" + label + "Counter").addClass("hidden");
+	this.table.find("#timeCounter").addClass("hidden");
+};
+
+Table.prototype.onMark = function(tableIndex, cellId) {};
+
+Table.prototype.doMark = function(cellId, label) {
+	if (label === 0 || label === 1) {
+		var cell = this.table.find("td[cellId="+cellId+"]");
+		cell.find("strong").text(label ? "O" : "X");
+		cell.attr({marked: "true", isActive: "false"});
+	}
+};
+
+Table.prototype.countPlayer = function(label) {
+	this.counts = 10;
+	this.table.find("#p" + label + "Counter").text(this.counts);
+	this.intervalID = setInterval(this.count, 1000, this, label);
+};
+
+Table.prototype.count = function(that, label) {
+	counts = --that.counts;
+	that.table.find("#p" + label + "Counter").text(counts);
+	if (counts === 0) {
+		clearInterval(that.intervalID);
+		that.intervalID = undefined;
+	}
+};
+
+Table.prototype.stopTimeCounter = function() {
+	if (this.intervalID != undefined) {
+		clearInterval(this.intervalID);
+		this.intervalID = undefined;
+	}
+};
+
+Table.prototype.doWin = function(data) {
+	this.stopTimeCounter();
+	this.result = data.winner.label;
+	this.table.find("#p0Counter").html("&nbsp;");
+	this.table.find("#p0Counter").addClass("hidden");
+	this.table.find("#p1Counter").html("&nbsp;");
+	this.table.find("#p1Counter").addClass("hidden");
+	this.table.find("#timeCounter").addClass("hidden");
+	this.table.find("#result").removeClass("hidden");
+	var winnerName;
+	if (data.winner.name === "") {
+		winnerName = "Player" + data.winner.label;
+	} else {
+		winnerName = data.winner.name;
+	}
+	this.table.find("#result").text(winnerName + "(" + (data.winner.label ? "O" : "X") + ") wins");
+	if (data.pos != undefined) {
+		for (var i = 0; i < data.pos.length; i++) {
+			this.table.find('[cellId="'+data.pos[i]+'"]').addClass("text-primary");
+		}
+	}
+	this.initPlayers();
+};
+
+Table.prototype.doTie = function() {
+	this.stopTimeCounter();
+	this.result = 2;
+	this.table.find("#p0Counter").html("&nbsp;");
+	this.table.find("#p0Counter").addClass("hidden");
+	this.table.find("#p1Counter").html("&nbsp;");
+	this.table.find("#p1Counter").addClass("hidden");
+	this.table.find("#timeCounter").addClass("hidden");
+	this.table.find("#result").removeClass("hidden");
+	this.table.find("#result").text("Tie");
+	this.initPlayers();
 };

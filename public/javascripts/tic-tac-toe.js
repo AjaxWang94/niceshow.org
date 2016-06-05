@@ -4,34 +4,37 @@ $(document).ready(function() {
 	// var wsUri = "ws://192.168.31.16:4080";
 	
 	var events = {
-			outgoing: {
-		    PLAYER_CONNECTED: 'csPlayerConnected',
-				SYNC_STATE: 'csSyncState',
-				JOIN_ROOM: 'csJoinRoom',
-				JOIN_TABLE: 'csJoinTable',
-				MARK: 'csMark',
-				QUIT_TABLE: 'csQuitTable'
-			},
-			incoming: {
-		    PLAYER_CONNECTED: 'scPlayerConnected',
-				SYNC_STATE: 'scSyncState',
-				JOIN_ROOM: 'scJoinRoom',
-				JOIN_TABLE: 'scJoinTable',
-				MARK: 'scMark',
-				SET_TURN: 'scSetTurn',
-				OPPONENT_READY: 'scOpponentReady',
-				GAME_OVER: 'scGameOver',
-				ERROR: 'scError',
-				QUIT_TABLE: 'scQuitTable'
-			}
+		outgoing: {
+			PLAYER_CONNECTED: 'csPlayerConnected',
+			UPDATE_PLAYER_NUMBERS: 'csUpdatePlayerNumbers',
+			SYNC_STATE: 'csSyncState',
+			ADD_NAME: 'csAddName',
+			JOIN_TABLE: 'csJoinTable',
+			MARK: 'csMark',
+			QUIT_TABLE: 'csQuitTable'
+		},
+		incoming: {
+			PLAYER_CONNECTED: 'scPlayerConnected',
+			UPDATE_PLAYER_NUMBERS: 'scUpdatePlayerNumbers',
+			SYNC_STATE: 'scSyncState',
+			ADD_NAME: 'scAddName',
+			JOIN_TABLE: 'scJoinTable',
+			START_GAME: 'scStartGame',
+			MARK: 'scMark',
+			SET_TURN: 'scSetTurn',
+			TIME_OUT: 'scTimeOut',
+			QUIT_TABLE: 'scQuitTable',
+			GAME_OVER: 'scGameOver',
+			ERROR: 'scError'
+		}
 	};
 
 	var player = new Player();
 	var tables = [];
-	var websocket;
 	for (var i = 0; i < 8; i++) {
 		tables.push(new Table(i));
 	}
+	var websocket;
 
 	function makeMessage(action, data){
 		var resp = {
@@ -42,8 +45,8 @@ $(document).ready(function() {
 	}
 
 	for (var i = 0; i < 8; i++) {
-		tables[i].onMark = function(tableIndex, cellId){
-			websocket.send(makeMessage(events.outgoing.MARK, {tableIndex: tableIndex, cellId: cellId}));
+		tables[i].onMark = function(cellId){
+			websocket.send(makeMessage(events.outgoing.MARK, {cellId: cellId}));
 		};
 	}
 
@@ -51,33 +54,30 @@ $(document).ready(function() {
 		var name = jQuery.trim($("#nameInput").val());
 		if (name.length > 0) {
 			player.name = name;
-			websocket.send(makeMessage(events.outgoing.JOIN_ROOM, player.name));
-			$(this).attr({disabled: "disabled"});
-			$("#nameInput").attr({disabled: "disabled"});
+			websocket.send(makeMessage(events.outgoing.ADD_NAME, {name: player.name}));
 		}
 	});
 
-	$(".panel-heading").hover(
-		function() {
-			if (player.name && !(player.currentTable+1)) {
-				var index = parseInt($(this).parent().attr("table-index"));
-				if (tables[index].isOnGame === false) {
-					$(this).css({cursor: "pointer"});
+	$(".panel-heading").click(function(evt) {
+		var label = parseInt(evt.target.getAttribute("label"));
+		if (!isNaN(label)) {
+			if (player.currentTable === -1) {
+				var index = parseInt($(this).closest(".panel").attr("table-index"));
+				if (tables[index].players[label] === undefined) {
+					var msg = {tableIndex: index, label: label};
+					websocket.send(makeMessage(events.outgoing.JOIN_TABLE, msg));
 				}
 			}
-		},
-		function() {
-			$(this).css({cursor: "default"});
 		}
-	);
+	});
 
-	$(".panel-heading").click(function() {
-		var offset = $(this).parent().offset();
-		if (player.name && !(player.currentTable+1)) {
-			$(this).css({cursor: "default"});
-			var tableIndex = parseInt($(this).parent().attr("table-index"));
-			var msg = {tableIndex: tableIndex};
-			websocket.send(makeMessage(events.outgoing.JOIN_TABLE, msg));
+	$(".panel-footer").click(function(evt) {
+		var label = parseInt(evt.target.getAttribute("label"));
+		if (!isNaN(label)) {
+			var index = parseInt($(this).closest(".panel").attr("table-index"));
+			if (player.currentTable === index && player.label === label) {
+				websocket.send(makeMessage(events.outgoing.QUIT_TABLE, {}));
+			}
 		}
 	});
 
@@ -110,55 +110,79 @@ $(document).ready(function() {
 		switch (msg.action) {
 
 			case events.incoming.ERROR:
+				console.log(msg.data);
 				break;
 
 			case events.incoming.PLAYER_CONNECTED:
 				player.id = msg.data.socketId;
 				break;
 
+			case events.incoming.UPDATE_PLAYER_NUMBERS:
+				$("#playerNumbers").text(msg.data.playerNumbers);
+				break;
+
 			case events.incoming.SYNC_STATE:
 				for (var i = 0; i < 8; i++) {
-					tables[i].syncState(msg.data[i]);
+					tables[i].syncState(msg.data.tables[i]);
 				}
+				break;
+
+			case events.incoming.ADD_NAME:
+				$("#nameInput").val(msg.data.name);
+				$("#nameInput").attr({disabled: "disabled"});
+				$("#playBtn").attr({disabled: "disabled"});
 				break;
 
 			case events.incoming.JOIN_TABLE:
 				tables[msg.data.currentTable].addPlayer(msg.data);
-				if (msg.data.id === player.id) {
+				if (player.id === msg.data.id) {
 					player.currentTable = msg.data.currentTable;
 					player.label = msg.data.label;
+					tables[msg.data.currentTable].ready();
+				}
+				break;
+
+			case events.incoming.START_GAME:
+				if (player.id === msg.data.id) {
+					tables[msg.data.currentTable].enableTurn();
+				}
+				tables[msg.data.currentTable].countPlayer(0);
+				break;
+
+			case events.incoming.QUIT_TABLE:
+				tables[msg.data.currentTable].doQuit(msg.data.label);
+				if (msg.data.id === player.id) {
+					player.currentTable = -1;
+					player.label = -1;
+				}
+				break;
+
+			case events.incoming.MARK:
+				tables[msg.data.tableIndex].stopTimeCounter();
+				tables[msg.data.tableIndex].doMark(msg.data.cellId, msg.data.label);
+				if (player.currentTable === msg.data.tableIndex) {
+					tables[msg.data.tableIndex].countPlayer(msg.data.label ? 0 : 1);
 				}
 				break;
 
 			case events.incoming.SET_TURN:
-				tables[msg.data.tableIndex].isOnGame = true;
 				tables[msg.data.tableIndex].enableTurn();
 				break;
 
-			case events.incoming.MARK:
-				tables[msg.data.tableIndex].doMark(msg.data.cellId, msg.data.label);
-				break;
-
 			case events.incoming.GAME_OVER:
-				if (msg.data.pos) {
-					tables[msg.data.tableIndex].doWinner(msg.data);
+				if (msg.data.winner != undefined) {
+					tables[msg.data.winner.currentTable].doWin(msg.data);
+					if (msg.data.winner.currentTable === player.currentTable) {
+						player.currentTable = -1;
+						player.label = -1;
+					}
 				} else {
-					tables[msg.data.tableIndex].doDraw();
+					tables[msg.data.tableIndex].doTie();
+					if (msg.data.tableIndex === player.currentTable) {
+						player.currentTable = -1;
+						player.label = -1;
+					}
 				}
-				if (msg.data.tableIndex === player.currentTable) {
-					player.currentTable = -1;
-					player.label = -1;
-				}
-				break;
-
-			case events.incoming.QUIT_TABLE:
-				if (msg.data.id === player.id) {
-					tables[player.currentTable].disableAll();
-					player.currentTable = -1;
-					player.label = -1;
-				}
-				tables[msg.data.currentTable].doQuit(msg.data.label);
-				// websocket.close();
 				break;
 		}
 	}

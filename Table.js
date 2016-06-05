@@ -1,99 +1,115 @@
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
 
-/**
- *
- * @constructor
- */
 var Table = function(tableIndex) {
 	this.tableIndex = tableIndex;
-	this.clear();
-};
 
-Table.prototype.clear = function() {
 	this.players = [];
-	this.isOnGame = false;
-	this.currentTurn = 0;
-	this.cells = [];
-	for (var i = 0; i < 9; i++) {
-		this.cells.push({label: -1, active: false});
-	}
-	this.timeoutObject;
+	this.currentTurn = -1;
+
+	this.initBoard();
+	this.result = -1;
+	this.winPos = undefined;
+
+	this.timeoutObject = undefined;
 };
 
 Table.events = {
 	JOIN_TABLE: 'joinTable',
-	SET_TURN: 'setTurn',
+	START_GAME: 'startGame',
 	CELL_MARKED: 'cellMarked',
-	WINNER: 'winner',
-	DRAW: 'draw',
-	QUIT: 'quit'
+	SET_TURN: 'setTurn',
+	QUIT_TABLE: 'quitTable',
+	WIN: 'win',
+	TIE: 'tie'
 };
 
 util.inherits(Table, EventEmitter);
 
-Table.prototype.disableAll = function() {
+Table.prototype.initBoard = function() {
+	this.cells = [];
+	for (var i = 0; i < 9; i++) {
+		this.cells.push({label: -1, active: false});
+	}
+};
+
+Table.prototype.enableBoard = function() {
+	this.cells.forEach(function(cell) {
+		cell.active = true;
+	});
+};
+
+Table.prototype.disableBoard = function() {
 	this.cells.forEach(function(cell) {
 		cell.active = false;
 	});
 };
 
-Table.prototype.enableTurn = function() {
-	this.cells.forEach(function(cell) {
-		if (cell + 1) {
-			cell.active = true;
-		}
-	});
-};
+Table.prototype.addPlayer = function(player) {
+	this.players[player.label] = player;
+	this.emit(Table.events.JOIN_TABLE, player);
 
-Table.prototype.checkTurn = function(socketId) {
-	return this.players[this.currentTurn].id == playerId;
-};
-
-Table.prototype.quit = function(that) {
-	// console.log(that.currentTurn + " quit");
-	that.isOnGame = false;
-	that.disableAll();
-	that.emit(Table.events.QUIT, that.players[that.currentTurn]);
-	that.players[that.currentTurn] = undefined;
-	clearTimeout(that.timeoutObject);
-}
-
-Table.prototype.mark = function(cellId) {
-
-	var cell = this.cells[cellId];
-
-	if (!cell) {
-		return false;
+	if (this.result != -1) {
+		this.initBoard();
+		this.result = -1;
+		this.winPos = undefined;
 	}
 
-	if (this.isOnGame && cell.active) {
-		// stop former timeout
-		if (this.timeoutObject) {
-			clearTimeout(this.timeoutObject);
-			// console.log("timeout stoped");
-		}
+	if (this.players[0] != undefined && this.players[1] != undefined) {
+		this.enableBoard();
+		this.currentTurn = 0;
+		this.emit(Table.events.START_GAME, this.players);
+		this.timeoutObject = setTimeout(this.timeOut, 10000, this);
+	}
+};
 
-		var player = this.players[this.currentTurn];
-		var label = this.currentTurn;
-		cell.label = label;
-		cell.active = false;
-
-		this.emit(Table.events.CELL_MARKED, {tableIndex: this.tableIndex, cellId: cellId, label: label});
-
-		var res = this.checkWinner(label);
-		if (res.win) {
-			this.clear();
-			console.log("Table " + this.tableIndex + " game over.");
-			this.emit(Table.events.WINNER, {tableIndex: this.tableIndex, label: this.currentTurn, pos: res.pos});
-		} else if (this.checkDraw()) {
-			this.clear();
-			console.log("Table " + this.tableIndex + " game over.");
-			this.emit(Table.events.DRAW, {tableIndex: this.tableIndex});
+Table.prototype.quit = function(player) {
+	if (this.players[player.label].id === player.id) {
+		if (this.players[0] != undefined && this.players[1] != undefined) {
+			this.stopTimeCounter();
+			var opponent = player.label ? 0 : 1;
+			this.emit(Table.events.WIN, {players: this.players, winner: opponent});
+			this.players = [];
+			this.currentTurn = -1;
+			this.disableBoard();
 		} else {
-			this.currentTurn = (this.currentTurn + 1) % 2;
-			this.emit(Table.events.SET_TURN, this.players[this.currentTurn]);
-			this.timeoutObject = setTimeout(this.quit, 10000, this);
+			this.players[player.label] = undefined;
+			this.emit(Table.events.QUIT_TABLE, player);
+		}
+	}
+}
+
+Table.prototype.mark = function(label, cellId) {
+	if (this.currentTurn === label) {
+		var cell = this.cells[cellId];
+		if (cell.label === -1) {
+
+			this.stopTimeCounter();
+
+			cell.label = label;
+			cell.active = false;
+
+			var evt = {tableIndex: this.tableIndex, label: label, cellId: cellId};
+			this.emit(Table.events.CELL_MARKED, evt);
+
+			var res = this.checkWinner(label);
+			if (res.win) {
+				this.result = label;
+				this.winPos = res.pos;
+				this.emit(Table.events.WIN, {players: this.players, winner: label, pos: res.pos});
+				this.players = [];
+				this.currentTurn = -1;
+				this.disableBoard();
+			} else if (this.checkTie()) {
+				this.result = 2;
+				this.emit(Table.events.TIE, {players: this.players});
+				this.players = [];
+				this.currentTurn = -1;
+			} else {
+				this.currentTurn = (label + 1) % 2;
+				this.emit(Table.events.SET_TURN, this.players[this.currentTurn]);
+				this.timeoutObject = setTimeout(this.timeOut, 10000, this);
+			}
 		}
 	}
 };
@@ -134,20 +150,25 @@ Table.prototype.checkWinner = function(label) {
 	};
 }
 
-Table.prototype.checkDraw = function() {
+Table.prototype.checkTie = function() {
 	return this.cells.every(function(cell) {
-		return (cell.label + 1);
+		return (cell.label != -1);
 	}, this);
 };
 
-Table.prototype.addPlayer = function(player) {
-	this.players[player.label] = player;
-	this.isOnGame = this.players[0] != undefined && this.players[1] != undefined;
-	this.emit(Table.events.JOIN_TABLE, player);
+Table.prototype.timeOut = function(that) {
+	that.stopTimeCounter();
+	that.result = (that.currentTurn + 1) % 2;
+	that.emit(Table.events.WIN, {players: that.players, winner: that.result});
+	that.players = [];
+	that.currentTurn = -1;
+	that.disableBoard();
+}
 
-	if (this.isOnGame) {
-		this.enableTurn();
-		this.emit(Table.events.SET_TURN, this.players[this.currentTurn]);
+Table.prototype.stopTimeCounter = function() {
+	if (this.timeoutObject != undefined) {
+		clearTimeout(this.timeoutObject);
+		this.timeoutObject = undefined;
 	}
 };
 

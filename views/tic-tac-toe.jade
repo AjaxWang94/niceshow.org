@@ -6,91 +6,127 @@ block link
 block content
 	.container
 		div.page-header
-			h3 Tic Tac Toe
-		.col-sm-6.col-md-3.input-group#nameInputGroup
-			input.form-control#nameInput(type="text", placeholder="Nickname")
-			span.input-group-btn
-				button.btn.btn-default#playBtn(type="button") Play
+			h3 Tic Tac Toe 
+				small Number of Online Players: 
+					span#playerNumbers 0
+		.row
+			.col-sm-6.col-md-3
+				.input-group
+					input.form-control#nameInput(type="text", placeholder="Nickname", maxlength="8")
+					span.input-group-btn
+						button.btn.btn-default#playBtn(type="button") Play
 		hr
 		- var n = 0
-		.row#row0
+		.row
 			while n < 4
-				.col-sm-6.col-md-3.panel.panel-default(table-index= n)
-					.panel-heading
-						.row
-							.col-xs-6
-								h6.col-xs-6.text-left X
-								h6.col-xs-6.text-left#countdown0 0
-								h6.text-left
-									span.playerName#p0Name &nbsp;
-							.col-xs-6
-								h6.col-xs-6.text-right#countdown1 0
-								h6.col-xs-6.text-right O
-								h6.text-right
-									span.playerName#p1Name &nbsp;
-					.panel-body
-						table
-							tr
-								td.text-center(cellId="0")
-									strong
-								td.text-center(cellId="1")
-									strong
-								td.text-center(cellId="2")
-									strong
-							tr
-								td.text-center(cellId="3")
-									strong
-								td.text-center(cellId="4")
-									strong
-								td.text-center(cellId="5")
-									strong
-							tr
-								td.text-center(cellId="6")
-									strong
-								td.text-center(cellId="7")
-									strong
-								td.text-center(cellId="8")
-									strong
+				.col-sm-6.col-md-3
+					.panel.panel-success(table-index= n)
+						.panel-heading
+							.row
+								.col-xs-3
+									button.btn.btn-default(label="0") X
+								.col-xs-6
+									.row#timeCounter.hidden
+										.col-xs-6
+											button.btn.btn-default#p0Counter.hidden &nbsp;
+										.col-xs-6
+											button.btn.btn-default#p1Counter.hidden &nbsp;
+									button.btn.btn-default#result.hidden
+								.col-xs-3
+									button.btn.btn-default(label="1") O
+						.panel-body
+							table
+								tr
+									td.text-center(cellId="0")
+										strong
+									td.text-center(cellId="1")
+										strong
+									td.text-center(cellId="2")
+										strong
+								tr
+									td.text-center(cellId="3")
+										strong
+									td.text-center(cellId="4")
+										strong
+									td.text-center(cellId="5")
+										strong
+								tr
+									td.text-center(cellId="6")
+										strong
+									td.text-center(cellId="7")
+										strong
+									td.text-center(cellId="8")
+										strong
+						.panel-footer
+							.row
+								.col-xs-6
+									.dropup
+										button.btn.btn-default.dropdown-toggle#p0Name(type="button", data-toggle="dropdown") &nbsp;
+										ul.dropdown-menu
+											li
+												a(label="0") Quit
+								.col-xs-6
+									.dropup
+										button.btn.btn-default.dropdown-toggle#p1Name(type="button", data-toggle="dropdown") &nbsp;
+										ul.dropdown-menu
+											li
+												a(label="1") Quit
 				- n++
 		- var n = 0
-		.row#row1
+		.row
 			while n < 4
-				.col-sm-6.col-md-3.panel.panel-default(table-index= n+4)
-					.panel-heading
-						.row
-							.col-xs-6
-								h6.col-xs-6.text-left X
-								h6.col-xs-6.text-left#countdown0 0
-								h6.text-left
-									span.playerName#p0Name &nbsp;
-							.col-xs-6
-								h6.col-xs-6.text-right#countdown1 0
-								h6.col-xs-6.text-right O
-								h6.text-right
-									span.playerName#p1Name &nbsp;
-					.panel-body
-						table
-							tr
-								td.text-center(cellId="0")
-									strong
-								td.text-center(cellId="1")
-									strong
-								td.text-center(cellId="2")
-									strong
-							tr
-								td.text-center(cellId="3")
-									strong
-								td.text-center(cellId="4")
-									strong
-								td.text-center(cellId="5")
-									strong
-							tr
-								td.text-center(cellId="6")
-									strong
-								td.text-center(cellId="7")
-									strong
-								td.text-center(cellId="8")
-									strong
+				.col-sm-6.col-md-3
+					.panel.panel-success(table-index= n+4)
+						.panel-heading
+							.row
+								.col-xs-3
+									button.btn.btn-default(label="0") X
+								.col-xs-6
+									.row#timeCounter.hidden
+										.col-xs-6
+											button.btn.btn-default#p0Counter.hidden &nbsp;
+										.col-xs-6
+											button.btn.btn-default#p1Counter.hidden &nbsp;
+									button.btn.btn-default#result.hidden
+								.col-xs-3
+									button.btn.btn-default(label="1") O
+						.panel-body
+							table
+								tr
+									td.text-center(cellId="0")
+										strong
+									td.text-center(cellId="1")
+										strong
+									td.text-center(cellId="2")
+										strong
+								tr
+									td.text-center(cellId="3")
+										strong
+									td.text-center(cellId="4")
+										strong
+									td.text-center(cellId="5")
+										strong
+								tr
+									td.text-center(cellId="6")
+										strong
+									td.text-center(cellId="7")
+										strong
+									td.text-center(cellId="8")
+										strong
+						.panel-footer
+							.row
+								.col-xs-6
+									.dropup
+										button.btn.btn-default.dropdown-toggle#p0Name(type="button", data-toggle="dropdown") &nbsp;
+										ul.dropdown-menu
+											li
+												a(label="0") Quit
+								.col-xs-6
+									.dropup
+										button.btn.btn-default.dropdown-toggle#p1Name(type="button", data-toggle="dropdown") &nbsp;
+										ul.dropdown-menu
+											li
+												a(label="1") Quit
 				- n++
 
 block script
