@@ -31,6 +31,7 @@ var events = {
 		SYNC_STATE: 'scSyncState',
 		ADD_NAME: 'scAddName',
 		JOIN_TABLE: 'scJoinTable',
+		CLEAR_BOARD: 'scClearBoard',
 		START_GAME: 'scStartGame',
 		MARK: 'scMark',
 		SET_TURN: 'scSetTurn',
@@ -56,7 +57,7 @@ function makeTables(action, data) {
 	return JSON.stringify(resp, replacer);
 }
 
-var blacklist = ["currentTurn", "timeoutObject", "_events", "_eventsCount"];
+var blacklist = ["timeoutObject", "_events", "_eventsCount"];
 
 function replacer(key, value) {
 	var pass = blacklist.every(function(element) {
@@ -76,13 +77,10 @@ for (var i = 0; i < 8; i++) {
 		});
 	});
 
-	tables[i].on(Table.events.QUIT_TABLE, function(player) {
+	tables[i].on(Table.events.CLEAR_BOARD, function(evt) {
 		wss.clients.forEach(function(client) {
-			client.send(makeMessage(events.outgoing.QUIT_TABLE, player));
+			client.send(makeMessage(events.outgoing.CLEAR_BOARD, evt));
 		});
-		var player = sockets.get(player.id).player;
-		player.currentTable = -1;
-		player.label = -1;
 	});
 
 	tables[i].on(Table.events.START_GAME, function(players) {
@@ -100,33 +98,28 @@ for (var i = 0; i < 8; i++) {
 
 	tables[i].on(Table.events.SET_TURN, function(player) {
 		var client = sockets.get(player.id).ws;
-		client.send(makeMessage(events.outgoing.SET_TURN, {tableIndex: player.currentTable}));
+		client.send(makeMessage(events.outgoing.SET_TURN, {tableIndex: player.tableIndex}));
 	});
 
-	tables[i].on(Table.events.WIN, function(evt) {
-		// var msg = {tableIndex: evt.players[0].currentTable, winner: evt.winner, pos: evt.pos};
-		var msg = {winner: evt.players[evt.winner], pos: evt.pos};
+	tables[i].on(Table.events.QUIT_TABLE, function(player) {
+		wss.clients.forEach(function(client) {
+			client.send(makeMessage(events.outgoing.QUIT_TABLE, player));
+		});
+		var player = sockets.get(player.id).player;
+		player.tableIndex = -1;
+		player.label = -1;
+	});
+
+	tables[i].on(Table.events.GAME_OVER, function(table) {
+		var msg = {tableIndex: table.index, winner: table.winner, winPos: table.winPos};
 		wss.clients.forEach(function(client) {
 			client.send(makeMessage(events.outgoing.GAME_OVER, msg));
 		});
-		var player0 = sockets.get(evt.players[0].id).player;
-		player0.currentTable = -1;
+		var player0 = sockets.get(table.players[0].id).player;
+		player0.tableIndex = -1;
 		player0.label = -1;
-		var player1 = sockets.get(evt.players[1].id).player;
-		player1.currentTable = -1;
-		player1.label = -1;
-	});
-
-	tables[i].on(Table.events.TIE, function(evt) {
-		var msg = {tableIndex: evt.players[0].currentTable};
-		wss.clients.forEach(function(client) {
-			client.send(makeMessage(events.outgoing.GAME_OVER, msg));
-		});
-		var player0 = sockets.get(evt.players[0].id).player;
-		player0.currentTable = -1;
-		player0.label = -1;
-		var player1 = sockets.get(evt.players[1].id).player;
-		player1.currentTable = -1;
+		var player1 = sockets.get(table.players[1].id).player;
+		player1.tableIndex = -1;
 		player1.label = -1;
 	});
 }
@@ -159,8 +152,8 @@ wss.on('connection', function connection(ws) {
 		});
 
 		var player = sockets.get(socketId).player;
-		if (player.currentTable != -1 && player.label != -1) {
-			tables[player.currentTable].quit(player);
+		if (player.tableIndex != -1 && player.label != -1) {
+			tables[player.tableIndex].quit(player);
 		}
 
 		sockets.delete(socketId);
@@ -196,7 +189,7 @@ wss.on('connection', function connection(ws) {
 					break;
 
 				case events.incoming.JOIN_TABLE:
-					if (player.currentTable === -1) {
+					if (player.tableIndex === -1) {
 						var index = msg.data.tableIndex;
 						var label = msg.data.label;
 						var available = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -205,7 +198,7 @@ wss.on('connection', function connection(ws) {
 						});
 						if (pass && (label === 0 || label ===1)) {
 							if (tables[index].players[label] === undefined) {
-								player.currentTable = index;
+								player.tableIndex = index;
 								player.label = label;
 								tables[index].addPlayer(player);
 							}
@@ -214,8 +207,8 @@ wss.on('connection', function connection(ws) {
 					break;
 
 				case events.incoming.QUIT_TABLE:
-					if (player.currentTable != -1 && player.label != -1) {
-						tables[player.currentTable].quit(player);
+					if (player.tableIndex != -1 && player.label != -1) {
+						tables[player.tableIndex].quit(player);
 					}
 					break;
 
@@ -225,8 +218,8 @@ wss.on('connection', function connection(ws) {
 					var pass = available.some(function(element) {
 						return cellId === element;
 					});
-					if (pass && player.currentTable != -1) {
-						tables[player.currentTable].mark(player.label, cellId);
+					if (pass && player.tableIndex != -1) {
+						tables[player.tableIndex].mark(player.label, cellId);
 					}
 					break;
 			}

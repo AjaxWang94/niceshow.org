@@ -1,5 +1,5 @@
 var Table = function(tableIndex) {
-	this.tableIndex = tableIndex;
+	this.index = tableIndex;
 	this.table = $("div[table-index='"+tableIndex+"']");
 
 	this.initPlayers();
@@ -7,8 +7,6 @@ var Table = function(tableIndex) {
 
 	this.intervalID = undefined;
 	this.counts = undefined;
-
-	this.result = -1;
 };
 
 Table.prototype.initPlayers = function() {
@@ -24,7 +22,7 @@ Table.prototype.initBoard = function() {
 	});
 };
 
-Table.prototype.enableTurn = function() {
+Table.prototype.enableBoard = function() {
 	this.table.find("td").each(function() {
 		if ($(this).attr("marked") === "false") {
 			$(this).attr({isActive: "true"});
@@ -38,47 +36,52 @@ Table.prototype.disableBoard = function() {
 	});
 };
 
+Table.prototype.initTimeCounter = function() {
+	this.table.find("#p0Counter").html("&nbsp;");
+	this.table.find("#p1Counter").html("&nbsp;");
+	this.table.find("#p0Counter").addClass("hidden");
+	this.table.find("#p1Counter").addClass("hidden");
+	this.table.find("#timeCounter").addClass("hidden");
+};
+
+Table.prototype.initResult = function() {
+	this.table.find("#result").html("&nbsp;");
+	this.table.find("#result").addClass("hidden");
+};
+
+Table.prototype.clearBoard = function() {
+	this.initResult();
+	this.initBoard();
+	this.table.find("td").each(function() {
+		$(this).removeClass("text-primary");
+	});
+}
+
 Table.prototype.syncState = function(table) {
-	this.result = table.result;
 	this.addPlayer(table.players[0]);
 	this.addPlayer(table.players[1]);
 	for (var i = 0; i < 9; i++) {
 		this.doMark(i, table.cells[i].label);
 	}
-	if (table.result != -1) {
-		if (table.result === 0 || table.result === 1) {
-			this.doWin({label: table.result, pos: table.winPos});
-		} else if (table.result === 2) {
-			this.doTie();
-		}
+	if (table.winner.label != -1) {
+		this.doGameOver({winner: table.winner, winPos: table.winPos});
 	}
 };
 
 Table.prototype.addPlayer = function(player) {
 	if (player != undefined) {
-
-		if (this.result != -1) {
-			this.table.find("#result").text("");
-			this.table.find("#result").addClass("hidden");
-			this.initBoard();
-			this.table.find("td").each(function() {
-				$(this).removeClass("text-primary");
-			});
-			this.result = -1;
-		}
-
 		this.players[player.label] = player;
-		if (player.name != "") {
-			this.table.find("#p" + player.label + "Name").text(player.name);
-		} else {
-			this.table.find("#p" + player.label + "Name").text("Player" + player.label);
+		var playerName = player.name;
+		if (playerName === "") {
+			playerName = "Player" + player.label;
 		}
+		this.table.find("#p" + player.label + "Name").text(playerName);
 		this.table.find("#timeCounter").removeClass("hidden");
 		this.table.find("#p" + player.label + "Counter").removeClass("hidden");
 	}
 };
 
-Table.prototype.ready = function() {
+Table.prototype.boardReady = function() {
 	var that = this;
 	this.table.find("td").click(function() {
 		if ($(this).attr("isActive") === "true") {
@@ -95,7 +98,7 @@ Table.prototype.doQuit = function(label) {
 	this.table.find("#timeCounter").addClass("hidden");
 };
 
-Table.prototype.onMark = function(tableIndex, cellId) {};
+Table.prototype.onMark = function(cellId) {};
 
 Table.prototype.doMark = function(cellId, label) {
 	if (label === 0 || label === 1) {
@@ -127,39 +130,23 @@ Table.prototype.stopTimeCounter = function() {
 	}
 };
 
-Table.prototype.doWin = function(data) {
+Table.prototype.doGameOver = function(data) {
 	this.stopTimeCounter();
-	this.result = data.winner.label;
-	this.table.find("#p0Counter").html("&nbsp;");
-	this.table.find("#p0Counter").addClass("hidden");
-	this.table.find("#p1Counter").html("&nbsp;");
-	this.table.find("#p1Counter").addClass("hidden");
-	this.table.find("#timeCounter").addClass("hidden");
+	this.initTimeCounter();
 	this.table.find("#result").removeClass("hidden");
-	var winnerName;
-	if (data.winner.name === "") {
-		winnerName = "Player" + data.winner.label;
+	if (data.winner.label === 2) {
+		this.table.find("#result").text("Tie");
 	} else {
-		winnerName = data.winner.name;
-	}
-	this.table.find("#result").text(winnerName + "(" + (data.winner.label ? "O" : "X") + ") wins");
-	if (data.pos != undefined) {
-		for (var i = 0; i < data.pos.length; i++) {
-			this.table.find('[cellId="'+data.pos[i]+'"]').addClass("text-primary");
+		var winnerName = data.winner.name;
+		if (winnerName === "") {
+			winnerName = "Player" + data.winner.label;
+		}
+		this.table.find("#result").text(winnerName + "(" + (data.winner.label ? "O" : "X") + ") wins");
+		if (data.winPos != undefined) {
+			for (var i = 0; i < data.winPos.length; i++) {
+				this.table.find('[cellId="'+data.winPos[i]+'"]').addClass("text-primary");
+			}
 		}
 	}
-	this.initPlayers();
-};
-
-Table.prototype.doTie = function() {
-	this.stopTimeCounter();
-	this.result = 2;
-	this.table.find("#p0Counter").html("&nbsp;");
-	this.table.find("#p0Counter").addClass("hidden");
-	this.table.find("#p1Counter").html("&nbsp;");
-	this.table.find("#p1Counter").addClass("hidden");
-	this.table.find("#timeCounter").addClass("hidden");
-	this.table.find("#result").removeClass("hidden");
-	this.table.find("#result").text("Tie");
 	this.initPlayers();
 };

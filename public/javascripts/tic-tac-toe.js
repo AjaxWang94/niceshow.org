@@ -19,6 +19,7 @@ $(document).ready(function() {
 			SYNC_STATE: 'scSyncState',
 			ADD_NAME: 'scAddName',
 			JOIN_TABLE: 'scJoinTable',
+			CLEAR_BOARD: 'scClearBoard',
 			START_GAME: 'scStartGame',
 			MARK: 'scMark',
 			SET_TURN: 'scSetTurn',
@@ -61,7 +62,7 @@ $(document).ready(function() {
 	$(".panel-heading").click(function(evt) {
 		var label = parseInt(evt.target.getAttribute("label"));
 		if (!isNaN(label)) {
-			if (player.currentTable === -1) {
+			if (player.tableIndex === -1) {
 				var index = parseInt($(this).closest(".panel").attr("table-index"));
 				if (tables[index].players[label] === undefined) {
 					var msg = {tableIndex: index, label: label};
@@ -75,7 +76,7 @@ $(document).ready(function() {
 		var label = parseInt(evt.target.getAttribute("label"));
 		if (!isNaN(label)) {
 			var index = parseInt($(this).closest(".panel").attr("table-index"));
-			if (player.currentTable === index && player.label === label) {
+			if (player.tableIndex === index && player.label === label) {
 				websocket.send(makeMessage(events.outgoing.QUIT_TABLE, {}));
 			}
 		}
@@ -134,25 +135,29 @@ $(document).ready(function() {
 				break;
 
 			case events.incoming.JOIN_TABLE:
-				tables[msg.data.currentTable].addPlayer(msg.data);
+				tables[msg.data.tableIndex].addPlayer(msg.data);
 				if (player.id === msg.data.id) {
-					player.currentTable = msg.data.currentTable;
+					player.tableIndex = msg.data.tableIndex;
 					player.label = msg.data.label;
-					tables[msg.data.currentTable].ready();
+					tables[msg.data.tableIndex].boardReady();
 				}
+				break;
+
+			case events.incoming.CLEAR_BOARD:
+				tables[msg.data.tableIndex].clearBoard();
 				break;
 
 			case events.incoming.START_GAME:
 				if (player.id === msg.data.id) {
-					tables[msg.data.currentTable].enableTurn();
+					tables[msg.data.tableIndex].enableBoard();
 				}
-				tables[msg.data.currentTable].countPlayer(0);
+				tables[msg.data.tableIndex].countPlayer(0);
 				break;
 
 			case events.incoming.QUIT_TABLE:
-				tables[msg.data.currentTable].doQuit(msg.data.label);
+				tables[msg.data.tableIndex].doQuit(msg.data.label);
 				if (msg.data.id === player.id) {
-					player.currentTable = -1;
+					player.tableIndex = -1;
 					player.label = -1;
 				}
 				break;
@@ -160,28 +165,21 @@ $(document).ready(function() {
 			case events.incoming.MARK:
 				tables[msg.data.tableIndex].stopTimeCounter();
 				tables[msg.data.tableIndex].doMark(msg.data.cellId, msg.data.label);
-				if (player.currentTable === msg.data.tableIndex) {
+				if (player.tableIndex === msg.data.tableIndex) {
 					tables[msg.data.tableIndex].countPlayer(msg.data.label ? 0 : 1);
 				}
 				break;
 
 			case events.incoming.SET_TURN:
-				tables[msg.data.tableIndex].enableTurn();
+				tables[msg.data.tableIndex].enableBoard();
 				break;
 
 			case events.incoming.GAME_OVER:
-				if (msg.data.winner != undefined) {
-					tables[msg.data.winner.currentTable].doWin(msg.data);
-					if (msg.data.winner.currentTable === player.currentTable) {
-						player.currentTable = -1;
-						player.label = -1;
-					}
-				} else {
-					tables[msg.data.tableIndex].doTie();
-					if (msg.data.tableIndex === player.currentTable) {
-						player.currentTable = -1;
-						player.label = -1;
-					}
+				console.log(msg.data.tableIndex);
+				tables[msg.data.tableIndex].doGameOver(msg.data);
+				if (player.tableIndex === msg.data.tableIndex) {
+					player.tableIndex = -1;
+					player.label = -1;
 				}
 				break;
 		}
