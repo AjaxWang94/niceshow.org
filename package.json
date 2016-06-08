@@ -2,24 +2,24 @@
 	"name": "niceshow.org",
 	"version": "1.0.0",
 	"private": true,
-	"description": "http://niceshow.org",
+	"description": "A multiplayer online game.",
 	"main": "app.js",
 	"scripts": {
 		"start": "node ./bin/www"
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/AjaxWang94/niceshow.org.git"
+		"url": "git+https://github.com/ajaxscott/Tic-Tac-Toe.git"
 	},
 	"keywords": [
-		"niceshow.org"
+		"multiplayer online game"
 	],
-	"author": "AjaxWang94",
+	"author": "ajaxscott",
 	"license": "ISC",
 	"bugs": {
-		"url": "https://github.com/AjaxWang94/niceshow.org/issues"
+		"url": "https://github.com/ajaxscott/Tic-Tac-Toe/issues"
 	},
-	"homepage": "https://github.com/AjaxWang94/niceshow.org#readme",
+	"homepage": "https://github.com/ajaxscott/Tic-Tac-Toe#readme",
 	"dependencies": {
 		"body-parser": "~1.13.2",
 		"cookie-parser": "~1.3.5",
