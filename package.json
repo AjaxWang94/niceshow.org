@@ -1,7 +1,6 @@
 {
 	"name": "niceshow.org",
 	"version": "1.0.0",
-	"private": true,
 	"description": "A multiplayer online game.",
 	"main": "app.js",
 	"scripts": {
