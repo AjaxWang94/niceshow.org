@@ -4,8 +4,8 @@ var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({ server: server });
 var port = 4080;
 
-var Table = require('./Table');
-var Player = require('./Player');
+var Table = require('./models/Table');
+var Player = require('./models/Player');
 
 var sockets = new Map();
 var tables = [];
