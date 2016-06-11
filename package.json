@@ -14,7 +14,7 @@
 		"multiplayer online game"
 	],
 	"author": "ajaxscott",
-	"license": "ISC",
+	"license": "MIT",
 	"bugs": {
 		"url": "https://github.com/ajaxscott/Tic-Tac-Toe/issues"
 	},
