@@ -96,7 +96,7 @@ Table.prototype.mark = function(label, cellId) {
 			var res = this.checkWinner(label);
 			if (res.win) {
 				this.winner.label = label;
-				this.winnerName = this.players[label].name;
+				this.winner.name = this.players[label].name;
 				this.winPos = res.winPos;
 				this.emit(Table.events.GAME_OVER, this);
 				this.players = [];
