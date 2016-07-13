@@ -8,7 +8,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/ajaxscott/tic-tac-toe.git"
+		"url": "https://github.com/ajaxscott/tic-tac-toe.git"
 	},
 	"keywords": [
 		"multiplayer online game"
